@@ -1,6 +1,6 @@
 # a-stock-data
 
-A 股全栈数据工具包 — 6 层架构 · 20 个端点 · 8 个数据源实测
+A 股全栈数据工具包 — 6 层架构 · 21 个端点 · 8 个数据源实测
 
 一个自包含的 Skill 文件，把分散在 8 个数据源里的 A 股原始数据整合成 AI 编程助手直接能用的工具集。你不用再背 mootdx 的 K 线参数、东财的 PDF Referer 头、iwencai 的 X-Claw 鉴权、百度 PAE 的 Header 拼接——全部封装好了。
 
@@ -34,7 +34,7 @@ A 股全栈数据 · 六层架构
 ├── 行情层    mootdx + 腾讯财经       K线 + 五档盘口 + PE/PB/市值/换手率
 ├── 研报层    东财 + akshare + iwencai 研报列表 / PDF下载 / 一致预期 / NL搜索
 ├── 信号层    同花顺 + 百度股市通      强势股 + 题材归因 + 北向资金 + 概念板块
-│            + akshare               + 资金流向 + 龙虎榜 + 解禁 + 行业对比
+│            + akshare + 东财DC      + 资金流向 + 龙虎榜 + 全市场龙虎榜 + 解禁 + 行业对比
 ├── 新闻层    akshare × 3             个股新闻 / 财联社快讯 / 全球资讯
 ├── 基础数据  mootdx finance / F10    37字段季报 + 9类公司资料
 └── 公告层    巨潮 cninfo + mootdx    沪深北全量公告
@@ -64,7 +64,7 @@ pip install mootdx akshare requests pandas stockstats
 
 ---
 
-## 20 个端点能力清单
+## 21 个端点能力清单
 
 ### 行情层（实时，不封 IP）
 
@@ -92,6 +92,7 @@ pip install mootdx akshare requests pandas stockstats
 | **百度概念板块** | 行业 / 概念 / 地域三维归属 + 当日涨跌幅（V2.1 新增） |
 | **百度资金流向** | 主力 / 散户 / 超大单分钟级 + 20 日历史（V2.1 新增） |
 | **龙虎榜席位** | 上榜记录 + 买卖席位 TOP5 + 机构动向（V2.1 新增） |
+| **全市场龙虎榜** | 每日全市场上榜股票 + 净买额排名 + 上榜原因（V2.1 新增） |
 | **限售解禁日历** | 历史解禁 + 未来 90 天待解禁预警（V2.1 新增） |
 | **行业横向对比** | 同花顺 90 行业涨跌排名 + 领涨股（V2.1 新增） |
 
@@ -130,6 +131,7 @@ pip install mootdx akshare requests pandas stockstats
 | 概念板块 | 「688017 属于哪些概念板块」 |
 | 资金流向 | 「000858 今天主力资金流入还是流出」 |
 | 龙虎榜 | 「002475 最近上过龙虎榜吗，哪些营业部在买」 |
+| 全市场龙虎榜 | 「今天龙虎榜哪些票净买入最多」 |
 | 解禁预警 | 「这只股票未来 3 个月有没有限售解禁」 |
 | 行业轮动 | 「今天哪些行业涨幅最大，资金在流入哪些板块」 |
 | 新闻公告 | 「拉一下 300476 最近的新闻和公告」 |
@@ -151,6 +153,7 @@ pip install mootdx akshare requests pandas stockstats
 | 功能 | 说明 |
 |------|------|
 | 龙虎榜席位 | 上榜原因 + 买卖营业部 TOP5 + 机构买卖统计 |
+| 全市场龙虎榜 | 每日全市场上榜股票 + 净买额排名 + 上榜原因 |
 | 限售解禁 | 历史全部解禁批次 + 未来 90 天待解禁预警 |
 | 行业横向 | 同花顺 ~90 行业涨跌排名 + 成交额 + 领涨股 |
 | 概念板块 | 百度股市通三维归属（行业/概念/地域） |
@@ -231,7 +234,7 @@ V2.1 改为本地自缓存。每次调用自动积累，越跑越丰富。首次
 
 # a-stock-data
 
-Full-stack data toolkit for China A-Share market — 6-layer architecture · 20 endpoints · 8 data sources, battle-tested
+Full-stack data toolkit for China A-Share market — 6-layer architecture · 21 endpoints · 8 data sources, battle-tested
 
 A self-contained Skill file that consolidates raw A-share data from 8 sources into a ready-to-use toolkit for AI coding assistants. No need to memorize mootdx candlestick parameters, Eastmoney PDF Referer headers, iwencai X-Claw authentication, or Baidu PAE header assembly — it's all handled.
 
@@ -249,7 +252,7 @@ China A-Share Full-Stack Data · 6-Layer Architecture
 ├── Market Data    mootdx + Tencent Finance     Candlesticks + Level-2 Order Book + PE/PB/Market Cap/Turnover
 ├── Research       Eastmoney + akshare + iwencai Report list / PDF download / Consensus EPS / NL search
 ├── Signals        THS + Baidu + akshare         Hot stocks + Sector attribution + Northbound flow
-│                                                + Concept blocks + Fund flow + Dragon Tiger + Lockup + Industry
+│                                                + Concept blocks + Fund flow + Dragon Tiger + Daily DT (full market) + Lockup + Industry
 ├── News           akshare × 3                   Stock news / CLS flash / Global finance
 ├── Fundamentals   mootdx finance / F10          37-field quarterly report + 9 categories of company data
 └── Filings        cninfo + mootdx               Full filings across SSE / SZSE / BSE
@@ -307,6 +310,7 @@ Launch Claude Code and say "Check the valuation of 688017" — the skill activat
 | **Baidu Concept Blocks** | Industry / Concept / Region classification + daily change (V2.1 new) |
 | **Baidu Fund Flow** | Institutional / Retail / Super-large order minute-level + 20-day history (V2.1 new) |
 | **Dragon Tiger Board** | Appearance records + Top 5 buy/sell brokerages + institutional activity (V2.1 new) |
+| **Daily Dragon Tiger (Full Market)** | All stocks on daily board + net buy ranking + appearance reasons (V2.1 new) |
 | **Lockup Expiry Calendar** | Historical releases + 90-day upcoming expiry alerts (V2.1 new) |
 | **Industry Comparison** | THS ~90 industries ranked by change + volume + leaders (V2.1 new) |
 
@@ -345,6 +349,7 @@ Just tell your AI assistant:
 | Concept Blocks | "What concept sectors does 688017 belong to" |
 | Fund Flow | "Is institutional money flowing into or out of 000858 today" |
 | Dragon Tiger Board | "Has 002475 appeared on the dragon tiger board recently, which brokerages are buying" |
+| Daily Dragon Tiger | "Which stocks had the highest net buy on today's dragon tiger board" |
 | Lockup Expiry | "Any lockup expiries coming up in the next 3 months for this stock" |
 | Industry Rotation | "Which industries are up the most today, where is money flowing" |
 | News & Filings | "Pull recent news and filings for 300476" |
@@ -366,6 +371,7 @@ Just tell your AI assistant:
 | Feature | Description |
 |---------|-------------|
 | Dragon Tiger Board | Appearance reasons + Top 5 buy/sell brokerages + institutional stats |
+| Daily Dragon Tiger (Full Market) | All stocks on daily board + net buy ranking + appearance reasons |
 | Lockup Expiry | Full release history + 90-day upcoming expiry alerts |
 | Industry Comparison | ~90 THS industries ranked by change + volume + leaders |
 | Concept Blocks | Baidu 3D classification (industry/concept/region) |

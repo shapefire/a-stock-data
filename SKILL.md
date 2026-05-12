@@ -11,9 +11,9 @@ version: 2.1
 
 # A股全栈数据工具包 V2.1
 
-六层数据架构，20 个端点，全部实测可用（2026-05-12 验证，覆盖主板/中小板/科创板/ST）。
+六层数据架构，21 个端点，全部实测可用（2026-05-12 验证，覆盖主板/中小板/科创板/ST）。
 
-> **V2.1 新增**：龙虎榜席位 + 限售解禁日历 + 行业横向对比 + 百度股市通（概念板块 / 资金流向）+ 北向自缓存 + F10 截断优化
+> **V2.1 新增**：龙虎榜席位 + 全市场龙虎榜 + 限售解禁日历 + 行业横向对比 + 百度股市通（概念板块 / 资金流向）+ 北向自缓存 + F10 截断优化
 
 **使用方式：** 将本文件放入 `~/.claude/skills/a-stock-data/SKILL.md`，Claude Code 会自动识别并在 A 股相关对话中激活。
 
@@ -32,6 +32,7 @@ version: 2.1
 ├── 同花顺北向     → hgt/sgt 分钟资金流向 + 本地自缓存历史 (V2.1 改)
 ├── 百度股市通     → 概念板块归属 + 个股资金流向 (V2.1 新增)
 ├── 龙虎榜席位     → 上榜记录 + 买卖席位 TOP5 + 机构动向 (V2.1 新增)
+├── 全市场龙虎榜   → 每日全市场上榜股票 + 净买额排名 (V2.1 新增)
 ├── 限售解禁日历   → 历史解禁 + 未来90天待解禁 (V2.1 新增)
 └── 行业横向对比   → 同花顺90行业涨跌排名 (V2.1 新增)
 
@@ -60,12 +61,13 @@ version: 2.1
 - 用户要看**概念板块归属**（行业/概念/地域）
 - 用户要看**个股资金流向**（主力/散户/超大单/大单分钟级）
 - 用户要看**龙虎榜席位**（营业部 + 机构买卖）
+- 用户要看**全市场龙虎榜**（当日所有上榜股票 + 净买额排名）
 - 用户要看**限售解禁日历**（历史解禁 + 未来待解禁）
 - 用户要做**行业横向对比**（涨跌排名 / 资金流入 / 领涨股）
 - 用户要看新闻资讯（个股新闻 / 财联社快讯 / 全球资讯）
 - 用户要查公告（巨潮公告全文）
 - 用户要做产业链调研 / 批量横向对比
-- 关键词：估值、一致预期、机构预测、市盈率、PEG、市值、研报、产业链、行业研究、K线、盘口、公告、新闻、**强势股、题材、热点、概念归因、北向资金、沪股通、深股通、概念板块、资金流向、主力、龙虎榜、席位、营业部、解禁、限售、行业对比、行业轮动**
+- 关键词：估值、一致预期、机构预测、市盈率、PEG、市值、研报、产业链、行业研究、K线、盘口、公告、新闻、**强势股、题材、热点、概念归因、北向资金、沪股通、深股通、概念板块、资金流向、主力、龙虎榜、席位、营业部、全市场龙虎榜、净买入、解禁、限售、行业对比、行业轮动**
 
 ---
 
@@ -1101,7 +1103,81 @@ for r in data["bottom"][-5:]:
 
 > **踩坑：** 成交额列名是 `总成交额`（不是 `成交额`），领涨股列名是 `领涨股`（不是 `领涨股票`），金额单位已经是亿元。该函数无日期参数，返回最新交易日数据。
 
-### 6.8 信号层组合用法：题材热度 + 资金验证
+### 6.8 全市场龙虎榜（V2.1 新增）
+
+每日全市场龙虎榜汇总——当日所有触发龙虎榜的股票 + 上榜原因 + 买卖净额 + 换手率。直接调东财 datacenter API，不依赖 akshare（akshare `stock_lhb_detail_em` 存在空页面解析 bug）。
+
+```python
+import requests
+from datetime import datetime
+
+def daily_dragon_tiger(trade_date: str = None, min_net_buy: float = None) -> dict:
+    """
+    全市场龙虎榜。
+    trade_date: YYYY-MM-DD（默认当日）
+    min_net_buy: 净买入下限（万元），None 不过滤
+    返回: {date, total_records, stocks: [{code, name, reason, close, change_pct,
+           net_buy_wan, buy_wan, sell_wan, turnover_pct}]}
+    """
+    if trade_date is None:
+        trade_date = datetime.now().strftime("%Y-%m-%d")
+    url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+    params = {
+        "reportName": "RPT_DAILYBILLBOARD_DETAILSNEW",
+        "columns": "ALL",
+        "filter": f"(TRADE_DATE>='{trade_date}')(TRADE_DATE<='{trade_date}')",
+        "pageNumber": "1",
+        "pageSize": "500",
+        "sortTypes": "-1",
+        "sortColumns": "BILLBOARD_NET_AMT",
+        "source": "WEB",
+        "client": "WEB",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Referer": "https://data.eastmoney.com/",
+    }
+    r = requests.get(url, params=params, headers=headers, timeout=15)
+    d = r.json()
+    if not d.get("success") or not d.get("result") or not d["result"].get("data"):
+        return {"date": trade_date, "total_records": 0, "stocks": [],
+                "note": "无数据（非交易日或盘后未更新）"}
+    data = d["result"]["data"]
+    actual_date = data[0].get("TRADE_DATE", "")[:10] if data else trade_date
+    stocks = []
+    for row in data:
+        net_buy = (row.get("BILLBOARD_NET_AMT") or 0) / 10000
+        if min_net_buy is not None and net_buy < min_net_buy:
+            continue
+        stocks.append({
+            "code": row.get("SECURITY_CODE", ""),
+            "name": row.get("SECURITY_NAME_ABBR", ""),
+            "reason": row.get("EXPLANATION", ""),
+            "close": row.get("CLOSE_PRICE") or 0,
+            "change_pct": round(float(row.get("CHANGE_RATE") or 0), 2),
+            "net_buy_wan": round(net_buy, 1),
+            "buy_wan": round((row.get("BILLBOARD_BUY_AMT") or 0) / 10000, 1),
+            "sell_wan": round((row.get("BILLBOARD_SELL_AMT") or 0) / 10000, 1),
+            "turnover_pct": round(float(row.get("TURNOVERRATE") or 0), 2),
+        })
+    return {"date": actual_date, "total_records": len(stocks), "stocks": stocks}
+
+# 用法
+data = daily_dragon_tiger("2026-05-09")
+print(f"{data['date']} 龙虎榜共 {data['total_records']} 条记录")
+for s in data["stocks"][:10]:
+    print(f"  {s['code']} {s['name']}: {s['reason']} | 净买{s['net_buy_wan']}万 涨跌{s['change_pct']}%")
+
+# 只看净买入 > 5000 万的
+data = daily_dragon_tiger("2026-05-09", min_net_buy=5000)
+print(f"\n净买入 > 5000万: {data['total_records']} 条")
+```
+
+> **与 6.5 龙虎榜席位的区别：** 6.5 是"查某只股票的龙虎榜历史 + 席位明细"（个股维度），6.8 是"查某天全市场所有上榜股票"（全市场维度）。前者回答"002475 最近上过龙虎榜吗"，后者回答"今天龙虎榜哪些票净买入最大"。
+
+> **数据源：** 东财 datacenter API（`RPT_DAILYBILLBOARD_DETAILSNEW`），绕过 akshare 的解析 bug。pageSize=500 足够覆盖单日所有记录（通常 80-120 条）。非交易日或收盘前调用返回空数据。
+
+### 6.9 信号层组合用法：题材热度 + 资金验证
 
 ```python
 # 拉当日强势股 reason
